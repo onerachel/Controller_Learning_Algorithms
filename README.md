@@ -1,4 +1,4 @@
-# Installation 
+# Controllers + Learners 
 
 Combination of 3 different types of controllers (CPG, DRL-Policy controller and NN) and 3 different type of learning algorithms (RevDE, PPO and NES) for robot locomotion using Mujoco (preferred) and Isaacgym based Revolve2 simulator.
 
@@ -10,8 +10,8 @@ simple steps to install are:
 3. cd revolve2/
    git clone https://github.com/onerachel/Controllers_Learners
 4. cd ..
-virtualenv -p python3.8 .venv
-source .venv/bin/activate
+   virtualenv -p python3.8 .venv
+   source .venv/bin/activate
 5. pip install ~/isaacgym/python/
 6. ./dev_requirements.sh
 ``` 
