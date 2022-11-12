@@ -1,32 +1,37 @@
-
+"""Optimizer for finding a good modular robot brain using direct encoding of the CPG brain weights, OpenAI ES algoriothm, and simulation using mujoco."""
 import math
 from random import Random
 from typing import List
-import torch
 
 import numpy as np
 import numpy.typing as npt
 from pyrr import Quaternion, Vector3
-from brain import RevDENNbrain
-from revde_optimizer import RevDEOptimizer
 from revolve2.actor_controller import ActorController
 from revolve2.actor_controllers.cpg import CpgNetworkStructure
 from revolve2.core.modular_robot import Body
 from revolve2.core.modular_robot.brains import (
-    BrainCpgNetworkStatic, make_cpg_network_structure_neighbour)
+    BrainCpgNetworkStatic,
+    make_cpg_network_structure_neighbour,
+)
 from revolve2.core.optimization import ProcessIdGen
+from revolve2.core.optimization.ea.openai_es import OpenaiESOptimizer
 from revolve2.core.physics.actor import Actor
-from revolve2.core.physics.running import (ActorControl, ActorState, Batch,
-                                           Environment, PosedActor, Runner)
+from revolve2.core.physics.running import (
+    ActorControl,
+    ActorState,
+    Batch,
+    Environment,
+    PosedActor,
+    Runner,
+)
+# from revolve2.runners.isaacgym import LocalRunner
+# from revolve2.runners.mujoco import LocalRunner
 from runner_mujoco import LocalRunner
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from network import Actor
-from config import ACTION_CONSTRAINT, NUM_OBS_TIMES
 
-
-class Optimizer(RevDEOptimizer):
+class Optimizer(OpenaiESOptimizer):
     """
     Optimizer for the problem.
 
@@ -36,7 +41,7 @@ class Optimizer(RevDEOptimizer):
     _body: Body
     _actor: Actor
     _dof_ids: List[int]
-    _network_structure: CpgNetworkStructure
+    _cpg_network_structure: CpgNetworkStructure
 
     _runner: Runner
     _controllers: List[ActorController]
@@ -55,13 +60,13 @@ class Optimizer(RevDEOptimizer):
         process_id_gen: ProcessIdGen,
         rng: Random,
         population_size: int,
+        sigma: float,
+        learning_rate: float,
         robot_body: Body,
         simulation_time: int,
         sampling_frequency: float,
         control_frequency: float,
         num_generations: int,
-        scaling: float,
-        cross_prob: float,
     ) -> None:
         """
         Initialize this class async.
@@ -83,12 +88,14 @@ class Optimizer(RevDEOptimizer):
         :param num_generations: Number of generation to run the optimizer for.
         """
         self._body = robot_body
-        self._init_actor_and_network_structure()
+        self._init_actor_and_cpg_network_structure()
 
-        parameters = self._network_structure.parameters()
-        vector = torch.nn.utils.parameters_to_vector(parameters)
-        stdv = 1. / math.sqrt(vector.shape[0])
-        initial_population = (-stdv - stdv) * torch.rand((population_size, vector.shape[0])) + stdv
+        nprng = np.random.Generator(
+            np.random.PCG64(rng.randint(0, 2**63))
+        )  # rng is currently not numpy, but this would be very convenient. do this until that is resolved.
+        initial_mean = nprng.standard_normal(
+            self._cpg_network_structure.num_connections
+        )
 
         await super().ainit_new(
             database=database,
@@ -97,9 +104,9 @@ class Optimizer(RevDEOptimizer):
             process_id_gen=process_id_gen,
             rng=rng,
             population_size=population_size,
-            initial_population=initial_population,
-            scaling=scaling,
-            cross_prob=cross_prob,
+            sigma=sigma,
+            learning_rate=learning_rate,
+            initial_mean=initial_mean,
         )
 
         self._init_runner()
@@ -149,7 +156,7 @@ class Optimizer(RevDEOptimizer):
             return False
 
         self._body = robot_body
-        self._init_actor_and_network_structure()
+        self._init_actor_and_cpg_network_structure()
 
         self._init_runner()
 
@@ -160,7 +167,7 @@ class Optimizer(RevDEOptimizer):
 
         return True
 
-    def _init_actor_and_network_structure(self) -> None:
+    def _init_actor_and_cpg_network_structure(self) -> None:
         self._actor, self._dof_ids = self._body.to_actor()
         active_hinges_unsorted = self._body.find_active_hinges()
         active_hinge_map = {
@@ -168,12 +175,13 @@ class Optimizer(RevDEOptimizer):
         }
         active_hinges = [active_hinge_map[id] for id in self._dof_ids]
 
-        actor = Actor((len(active_hinges)*NUM_OBS_TIMES, 4,), len(active_hinges))
-
-        self._network_structure = actor
+        self._cpg_network_structure = make_cpg_network_structure_neighbour(
+            active_hinges
+        )
 
     def _init_runner(self) -> None:
-        self._runner = LocalRunner(headless=True)
+        # self._runner = LocalRunner(LocalRunner.SimParams(), headless=True) #isaacgym
+        self._runner = LocalRunner(headless=True) #mujoco
 
     async def _evaluate_population(
         self,
@@ -192,10 +200,22 @@ class Optimizer(RevDEOptimizer):
         self._controllers = []
 
         for params in population:
-            
-            brain = RevDENNbrain()
-            controller = brain.make_controller(self._body, self._dof_ids, params)
-            controller.load_parameters(params)
+            initial_state = self._cpg_network_structure.make_uniform_state(
+                0.5 * math.pi / 2.0
+            )
+            weight_matrix = (
+                self._cpg_network_structure.make_connection_weights_matrix_from_params(
+                    params
+                )
+            )
+            dof_ranges = self._cpg_network_structure.make_uniform_dof_ranges(1.0)
+            brain = BrainCpgNetworkStatic(
+                initial_state,
+                self._cpg_network_structure.num_cpgs,
+                weight_matrix,
+                dof_ranges,
+            )
+            controller = brain.make_controller(self._body, self._dof_ids)
 
             bounding_box = self._actor.calc_aabb()
             self._controllers.append(controller)
@@ -211,7 +231,7 @@ class Optimizer(RevDEOptimizer):
                         ]
                     ),
                     Quaternion(),
-                    [0.0 for _ in range(len(self._dof_ids))],
+                    [0.0 for _ in controller.get_dof_targets()],
                 )
             )
             batch.environments.append(env)
@@ -228,11 +248,12 @@ class Optimizer(RevDEOptimizer):
             ]
         )
 
-    def _control(self, environment_index: int, dt: float, control: ActorControl, observations):
+    def _control(
+        self, environment_index: int, dt: float, control: ActorControl
+    ) -> None:
         controller = self._controllers[environment_index]
-        action = controller.get_dof_targets([torch.tensor(obs) for obs in observations])
-        control.set_dof_targets(0, torch.clip(action, -ACTION_CONSTRAINT, ACTION_CONSTRAINT))
-        return action.tolist()
+        controller.step(dt)
+        control.set_dof_targets(0, controller.get_dof_targets())
 
     @staticmethod
     def _calculate_fitness(begin_state: ActorState, end_state: ActorState) -> float:

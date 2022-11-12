@@ -4,8 +4,6 @@ from typing import List
 
 import mujoco
 import mujoco_viewer
-import numpy as np
-from config import (NUM_OBS_TIMES, NUM_OBSERVATIONS, NUM_STEPS)
 
 try:
     import logging
@@ -26,12 +24,17 @@ except Exception as e:
     pass
 
 from pyrr import Quaternion, Vector3
-from revolve2.actor_controller import ActorController
 from revolve2.core.physics.actor.urdf import to_urdf as physbot_to_urdf
-from revolve2.core.physics.running import (ActorControl, ActorState, Batch,
-                                           BatchResults, Environment,
-                                           EnvironmentResults,
-                                           EnvironmentState, Runner)
+from revolve2.core.physics.running import (
+    ActorControl,
+    ActorState,
+    Batch,
+    BatchResults,
+    Environment,
+    EnvironmentResults,
+    EnvironmentState,
+    Runner,
+)
 
 
 class LocalRunner(Runner):
@@ -57,6 +60,7 @@ class LocalRunner(Runner):
         logging.info("Starting simulation batch with mujoco.")
 
         control_step = 1 / batch.control_frequency
+        sample_step = 1 / batch.sampling_frequency
 
         results = BatchResults([EnvironmentResults([]) for _ in batch.environments])
 
@@ -71,7 +75,7 @@ class LocalRunner(Runner):
             data = mujoco.MjData(model)
 
             model.jnt_stiffness = [1.0] * (num_joints + 1)
-            model.dof_damping = [0.05] * len(data.qvel)
+            model.dof_damping = [1.0] * len(data.qvel)
 
             initial_targets = [
                 dof_state
@@ -90,37 +94,19 @@ class LocalRunner(Runner):
                 )
 
             last_control_time = 0.0
+            last_sample_time = 0.0
 
             # sample initial state
             results.environment_results[env_index].environment_states.append(
                 EnvironmentState(0.0, self._get_actor_states(env_descr, data, model))
             )
 
-            new_observation = [[] for _ in range(NUM_OBSERVATIONS)]
-            pos_sliding = np.zeros(NUM_OBS_TIMES*num_joints)
-            timestep = 0
-
-            while (time := data.time) < batch.simulation_time and timestep <= NUM_STEPS:
+            while (time := data.time) < batch.simulation_time:
                 # do control if it is time
-                if timestep == 0  or time >= last_control_time + control_step:
+                if time >= last_control_time + control_step:
                     last_control_time = math.floor(time / control_step) * control_step
                     control = ActorControl()
-                    
-                    results.environment_results[env_index].environment_states.append(
-                        EnvironmentState(
-                            time, self._get_actor_states(env_descr, data, model)
-                        )
-                    )
-
-                    # get hinges current position and head orientation
-                    hinges_pos = np.array(data.qpos[-num_joints:])
-                    orientation = np.array(self._get_actor_state(0, data, model).orientation)
-                    pos_sliding = np.concatenate((hinges_pos, pos_sliding.squeeze()[:num_joints*(NUM_OBS_TIMES - 1)]))
-                    
-                    new_observation[0] = np.array(pos_sliding, dtype=np.float32)
-                    new_observation[1] = np.array(orientation, dtype=np.float32)
-                    
-                    batch.control(env_index, control_step, control, new_observation)
+                    batch.control(env_index, control_step, control)
                     actor_targets = control._dof_targets
                     actor_targets.sort(key=lambda t: t[0])
                     targets = [
@@ -128,11 +114,16 @@ class LocalRunner(Runner):
                         for actor_target in actor_targets
                         for target in actor_target[1]
                     ]
-                    
-                    if timestep < NUM_STEPS:
-                        self._set_dof_targets(data, targets)
+                    self._set_dof_targets(data, targets)
 
-                    timestep += 1                                          
+                # sample state if it is time
+                if time >= last_sample_time + sample_step:
+                    last_sample_time = int(time / sample_step) * sample_step
+                    results.environment_results[env_index].environment_states.append(
+                        EnvironmentState(
+                            time, self._get_actor_states(env_descr, data, model)
+                        )
+                    )
 
                 # step simulation
                 mujoco.mj_step(model, data)
@@ -178,9 +169,6 @@ class LocalRunner(Runner):
             castshadow=False,
         )
         env_mjcf.visual.headlight.active = 0
-
-        # add the following to solve the error "Pre-allocated contact buffer is full"
-        env_mjcf.size.nconmax = 150
 
         for actor_index, posed_actor in enumerate(env_descr.actors):
             urdf = physbot_to_urdf(

@@ -1,9 +1,8 @@
 # Controllers + Learners 
 
-Combination of 3 different types of controllers (CPG, DRL-Policy controller and NN) and 3 different type of learning algorithms (RevDE, PPO and NES) for robot locomotion using Mujoco (preferred) and Isaacgym based Revolve2 simulator.
+Combination of 3 different types of controllers (CPG, DRL-Policy controller and NN) and 3 different types of learning algorithms (RevDE, PPO and NES) for robot locomotion using Mujoco and Isaacgym based Revolve2 simulator. Mujoco enviroment is preferred by the author. 
 
 ## Installation 
-simple steps to install are:
 ``` 
 1. Download isaacgym from https://developer.nvidia.com/isaac-gym
 2. git clone https://github.com/onerachel/revolve2

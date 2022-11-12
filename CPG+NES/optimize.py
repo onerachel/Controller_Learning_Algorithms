@@ -1,13 +1,15 @@
-"""Setup and running of the openai es optimization program."""
-
-import argparse
 import logging
-from random import Random
+import math
+import argparse
+from random import Random, sample
 
 from optimizer import Optimizer
+
 from revolve2.core.database import open_async_database_sqlite
+from revolve2.core.modular_robot import ActiveHinge, Body, Brick
 from revolve2.core.optimization import ProcessIdGen
 from revolve2.standard_resources import modular_robots
+
 
 
 async def main() -> None:
@@ -29,9 +31,9 @@ async def main() -> None:
     body = args.body
 
     POPULATION_SIZE = 10
-    NUM_GENERATIONS = 10
-    SCALING = 0.5
-    CROSS_PROB = 0.9
+    SIGMA = 0.1  # noise standard deviation
+    LEARNING_RATE = 0.005
+    NUM_GENERATIONS = 58
 
     SIMULATION_TIME = 30
     SAMPLING_FREQUENCY = 5
@@ -41,7 +43,7 @@ async def main() -> None:
     rng = Random()
     rng.seed(0)
 
-    file_path = "./data/RevDENN/"+body+"/database"+num
+    file_path = "./data/OpenaiES/"+body+"/database"+num
 
     # database
     database = open_async_database_sqlite(file_path)
@@ -54,7 +56,7 @@ async def main() -> None:
     log.setLevel(logging.INFO)
     for hdlr in log.handlers[:]:  # remove all old handlers
         log.removeHandler(hdlr)
-    log.addHandler(fileh) 
+    log.addHandler(fileh)
 
     # process id generator
     process_id_gen = ProcessIdGen()
@@ -75,31 +77,31 @@ async def main() -> None:
     )
     if maybe_optimizer is not None:
         logging.info(
-            f"Recovered. Last finished generation: {maybe_optimizer.generation_number - 1}."
+            f"Recovered. Last finished generation: {maybe_optimizer.generation_number}."
         )
         optimizer = maybe_optimizer
     else:
-        logging.info("No recovery data found. Starting at generation 0.")
+        logging.info(f"No recovery data found. Starting at generation 0.")
         optimizer = await Optimizer.new(
             database,
             process_id,
             process_id_gen,
             rng,
             POPULATION_SIZE,
+            SIGMA,
+            LEARNING_RATE,
             body,
             simulation_time=SIMULATION_TIME,
             sampling_frequency=SAMPLING_FREQUENCY,
             control_frequency=CONTROL_FREQUENCY,
             num_generations=NUM_GENERATIONS,
-            scaling=SCALING,
-            cross_prob=CROSS_PROB,
         )
 
     logging.info("Starting optimization process..")
 
     await optimizer.run()
 
-    logging.info("Finished optimizing.")
+    logging.info(f"Finished optimizing.")
 
 
 if __name__ == "__main__":
