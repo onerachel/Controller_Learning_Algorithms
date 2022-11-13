@@ -24,15 +24,15 @@ pd.set_option('display.max_columns', None)
 print(df.head())
 
 # Filter on winner
-DRL_win=df[df['winner'] == 'DRL']
-RevDE_win=df[df['winner'] == 'RevDE']
+DRL_win=df[df['winner_8'] == 'DRL+PPO']
+RevDE_win=df[df['winner_8'] == 'CPG+RevDE']
 
 
 data = [DRL_win, RevDE_win]
 for i, file in enumerate(data):
-    winner = data[i]['winner'].unique()
-    data[i] = data[i][['extremities', 'coverage',  'hinge_count', 'active_hinges_count', 'brick_count',
-                       'absolute_size', 'symmetry']] # 'size', 'proportion', 'width', 'height', 'joints','length_of_limbs', 'extensiveness','limbs',
+    winner = data[i]['winner_8'].unique()
+    data[i] = data[i][['extremities', 'hinge_count', 'active_hinges_count', 'brick_count',
+                       'absolute_size', 'symmetry','width', 'height']] # 'coverage','size', 'proportion', 'width', 'height', 'joints','length_of_limbs', 'extensiveness','limbs',
 
     # Heatmap for all the numerical data including the target 'fitness'
     # Define the heatmap parameters
@@ -64,17 +64,6 @@ for i, file in enumerate(data):
                 # yticklabels=cols.values,
                 # xticklabels=cols.values,
                 cmap="viridis")
-    plt.title(winner[0]+"-Fitness Correlation")
-    plt.savefig(path + "/databases_eval580/plot_images/heat_map_"+winner[0]+".png")
+    plt.title(winner[0]+"-Descriptors Correlation")
+    plt.savefig(path + "/databases_eval580/plot_images/heat_map_winner_8_"+winner[0]+".png")
     plt.show()
-
-    # Visualize individually
-    # corr = data[i].corr()["winner"].sort_values(ascending=False)[1:7] ## selecting 6 cols other than fitness(cm/s)
-    # print(winner[0])
-    # print(corr)
-#    f, ax = plt.subplots(nrows=6, ncols=1, figsize=(20, 40))
-#    for i, col in enumerate(corr.index):
-#        sns.scatterplot(x=col, y="fitness(cm/s)", data=df, ax=ax[i], color='darkorange')
-#        ax[i].set_title(f'{col} vs fitness')
-#    plt.savefig(path + "/databases_eval580/plot_images/correlation_scatter_plot_"+learner[0]+".png")
-#    plt.show()
