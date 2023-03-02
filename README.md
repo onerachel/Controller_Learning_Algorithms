@@ -19,6 +19,12 @@ We apply these three combinations to a test suite of modular robots and compare 
 5. ./dev_requirements.sh
 ``` 
 ## Partial results
+![ANN+RevDE](https://user-images.githubusercontent.com/75667244/222464951-180528d9-477c-46f3-9609-01bef6424df2.png)
+![CPG+RevDE](https://user-images.githubusercontent.com/75667244/222464997-a95cbe31-cbff-4d23-b27c-8bd8c6e84ace.png)
+![DRL+PPO](https://user-images.githubusercontent.com/75667244/222465037-a672ddc0-3b7f-414f-b47b-d5e500cab6b9.png)
+<img width="520" alt="fitness_avg_max_lineplot" src="https://user-images.githubusercontent.com/75667244/222466564-36d89743-69d8-4e71-8d99-ae491a0c3891.png">
+<img width="540" alt="fitness_MBF_params" src="https://user-images.githubusercontent.com/75667244/222467913-9dbb828a-1a23-4610-8980-54abd28020cb.png">
+![fitness_MBF_params_subplots](https://user-images.githubusercontent.com/75667244/222467956-33a28478-02b7-492e-bcf4-271992ef4fbe.png)
 
 
 ## Documentation 
