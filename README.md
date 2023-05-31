@@ -18,7 +18,7 @@ We apply these three combinations to a test suite of modular robots and compare 
 4. pip install ~/isaacgym/python/
 5. ./dev_requirements.sh
 ``` 
-## Partial results
+## Highlighted results
 ![ANN+RevDE](https://user-images.githubusercontent.com/75667244/222464951-180528d9-477c-46f3-9609-01bef6424df2.png)
 ![CPG+RevDE](https://user-images.githubusercontent.com/75667244/222464997-a95cbe31-cbff-4d23-b27c-8bd8c6e84ace.png)
 ![DRL+PPO](https://user-images.githubusercontent.com/75667244/222465037-a672ddc0-3b7f-414f-b47b-d5e500cab6b9.png)
