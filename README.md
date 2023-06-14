@@ -6,10 +6,13 @@ We perform an experimental comparison of three controller-and-learner combinatio
 
 We apply these three combinations to a test suite of modular robots and compare their efficacy, efficiency, and robustness. Surprisingly, the usual CPG-based and RL-based options are outperformed by the in-between combination that is more robust and efficient than the other two setups. 
 
+[note: The release version of Revolve2 used in this project is v0.3.1-beta1 (https://github.com/ci-group/revolve2/releases/tag/v0.3.1-beta1).]
+
 
 ## Installation 
 ``` 
-1. git clone https://github.com/onerachel/revolve2  [note: The release version of Revolve2 used in this project is v0.3.1-beta1 (https://github.com/ci-group/revolve2/releases/tag/v0.3.1-beta1).]
+1. git clone https://github.com/ci-group/revolve2 --branch v0.3.1-beta1
+   or git clone https://github.com/onerachel/revolve2
 2. cd revolve2/
    git clone https://github.com/onerachel/Controllers_Learners
 3. cd ..
