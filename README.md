@@ -15,8 +15,7 @@ We apply these three combinations to a test suite of modular robots and compare 
    or git clone https://github.com/onerachel/revolve2
 2. cd revolve2/
    git clone https://github.com/onerachel/Controllers_Learners
-3. cd ..
-   virtualenv -p python3.8 .venv
+3. virtualenv -p python3.8 .venv
    source .venv/bin/activate
 4. pip install ~/isaacgym/python/
 5. ./dev_requirements.sh
